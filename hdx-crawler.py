@@ -1,23 +1,11 @@
 """
-CKAN API documentation: http://docs.ckan.org/en/latest/api/
-Python CKAN library: https://github.com/ckan/ckanapi
-"""
-
-import ckanapi, json, sys, time, urllib
-from itertools import islice
-from openpyxl import load_workbook
-
-DELAY = 5
-"""Time delay in seconds between datasets, to give HDX a break."""
-
-CKAN_URL = "https://data.humdata.org"
-"""Base URL for the CKAN instance."""
-i = 0
-#The ultimate JSON file
-JSON = {}
-hxl_header_row = 1
-
-# format for output: the dictionary key is the file name, as it should be unique:
+# CKAN API documentation: http://docs.ckan.org/en/latest/api/
+# Python CKAN library: https://github.com/ckan/ckanapi
+#
+# This code crawls through all hxl-tagged datasets in HDX, and returns a JSON file locally with the data:
+#
+# format for output data: the dictionary key is the file name, as it should be unique:
+#
 # { some_file_name : { 
 #                    url: "/whatever/bla.csv",
 #                    all_hxl_tags: {
@@ -32,9 +20,21 @@ hxl_header_row = 1
 #                      } 
 #   name_of_file_2 : { url:"", all_hxl_tags: etc...}, 
 #   ... }
-#response = urllib.request.urlopen("http://data.humdata.org/dataset/ace9787d-1a4e-4ea5-a6c0-512c6e23a14e/resource/55d9d358-e9dd-4b5c-9c57-674bb0d9e483/download/Afghanistan_Conflict_Displacements_2016-2017.xlsx")
-#wb = load_workbook(response)
-#sheet_ranges = wb.active
+"""
+
+import ckanapi, json, sys, time, urllib
+from itertools import islice
+from openpyxl import load_workbook
+
+DELAY = 5
+"""Time delay in seconds between datasets, to give HDX a break."""
+
+CKAN_URL = "https://data.humdata.org"
+"""Base URL for the CKAN instance."""
+
+#The ultimate JSON file
+JSON = {}
+i = 0
 
 def populateJSON(resource, csvData):
     # escaping the "/" in the url
@@ -54,7 +54,7 @@ def readCsv(csvLocation):
     # to do: make count==1 dynamic (find line starting with #, if none return no valid HXL found)
     temp_dataset = []
     for line in content:
-        clean_line = line.decode("utf-8").replace("\n","")
+        clean_line = line.decode("utf-8").replace("\n","").replace("\r", "")
         split_line = clean_line.split(",")
         temp_dataset.append(split_line)
         if count == 4:
@@ -88,7 +88,7 @@ def readXlsx(fileLocation):
             key = ""
             for cell in column:
                 if i == 1:
-                    print("nothing")
+                    pass
                 if i == 2:
                     key=cell.value
                     data[key]={}
@@ -96,7 +96,8 @@ def readXlsx(fileLocation):
                     break
                 if i > 2 and i < 5 :
                     line_number = "line{}".format(i-2)
-                    data[key][str(line_number)]=str(cell.value)
+                    new_line = str(cell.value).replace("\r", "")
+                    data[key][str(line_number)]=str(new_line)
                 i += 1
     except:
         print("failed loading workbook")
