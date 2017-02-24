@@ -5,6 +5,7 @@ Python CKAN library: https://github.com/ckan/ckanapi
 
 import ckanapi, json, sys, time, urllib
 from itertools import islice
+from openpyxl import load_workbook
 
 DELAY = 5
 """Time delay in seconds between datasets, to give HDX a break."""
@@ -31,6 +32,9 @@ hxl_header_row = 1
 #                      } 
 #   name_of_file_2 : { url:"", all_hxl_tags: etc...}, 
 #   ... }
+#response = urllib.request.urlopen("http://data.humdata.org/dataset/ace9787d-1a4e-4ea5-a6c0-512c6e23a14e/resource/55d9d358-e9dd-4b5c-9c57-674bb0d9e483/download/Afghanistan_Conflict_Displacements_2016-2017.xlsx")
+#wb = load_workbook(response)
+#sheet_ranges = wb.active
 
 def populateJSON(resource, csvData):
     # escaping the "/" in the url
@@ -73,6 +77,32 @@ def readCsv(csvLocation):
     print("data = ",data)
     return data
 
+def readXlsx(fileLocation):
+    try:
+        response = urllib.request.urlopen(fileLocation)
+        wb = load_workbook(response)
+        sheet_ranges = wb.active
+        data={}
+        for column in sheet_ranges.columns:
+            i=1
+            key = ""
+            for cell in column:
+                if i == 1:
+                    print("nothing")
+                if i == 2:
+                    key=cell.value
+                    data[key]={}
+                if i == 5:
+                    break
+                if i > 2 and i < 5 :
+                    line_number = "line{}".format(i-2)
+                    data[key][str(line_number)]=str(cell.value)
+                i += 1
+    except:
+        print("failed loading workbook")
+        data = {}
+    return data
+
 # find datasets tagged HXL
 def find_hxl_datasets(start, rows):
     """Return a page of HXL datasets."""
@@ -104,23 +134,30 @@ for package_id in package:
     for resource in package[i]["resources"]:
         print("  {}".format(resource["name"]))
         print("    {}".format(resource["url"]))
-        print ("format: ",resource["format"])
+        print ("format: ", resource["format"])
 
         # if the resource is a csv then print content
         if resource["format"] == "CSV":
             try:
-                csvData = readCsv(resource["url"])
+                file_data = readCsv(resource["url"])
             except:
                 print("Error loading csv :(\n")
-            try:
-                populateJSON(resource, csvData)
-            except:
-                print("Error adding data to Json for file ", resource["name"], " :'( \n")
+                file_data = {}
 
+        if resource["format"] == "XLSX":
+            try:
+                file_data = readXlsx(resource["url"])
+            except:
+                print("Failed reading XLSX file :(\n")
+                file_data = {}
+        try:
+            populateJSON(resource, file_data)
+        except:
+            print("Error adding data to Json for file ", resource["name"], " :'( \n")
     print("")
     time.sleep(DELAY) # give HDX a short rest
     i += 1
-    if i == 2:
+    if i == 4:
         text_file = open("json.txt", "w")
         text_file.write(json.dumps(JSON))
         text_file.close()
